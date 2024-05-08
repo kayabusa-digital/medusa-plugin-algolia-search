@@ -1,0 +1,47 @@
+{
+	"name": "medusa-plugin-algolia-search",
+	"version": "0.1.0",
+	"description": "Aggregates products, filters products, transforms them and pushes to algolia indexes",
+	"main": "index.js",
+	"scripts": {
+		"build": "cross-env npm ci --ignore-scripts && tsc -p tsconfig.json",
+		"prepare": "cross-env NODE_ENV=production npm run build"
+	},
+	"files": [
+		"dist"
+	],
+	"engines": {
+		"node": ">=16"
+	},
+	"dependencies": {
+		"@medusajs/modules-sdk": "1.12.11",
+		"@medusajs/utils": "1.11.9",
+		"algoliasearch": "^4.15.0",
+		"cross-env": "^7.0.3"
+	},
+	"devDependencies": {
+		"@medusajs/types": "1.11.16",
+		"client-sessions": "^0.8.0",
+		"jest": "^25.5.4",
+		"rimraf": "^5.0.1",
+		"typescript": "^4.7.4"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/kayabusa-digital/medusa-plugin-algolia-search.git"
+	},
+	"author": "Kayabusa-tech",
+	"license": "ISC",
+	"bugs": {
+		"url": "https://github.com/kayabusa-digital/medusa-plugin-algolia-search/issues"
+	},
+	"homepage": "https://github.com/kayabusa-digital/medusa-plugin-algolia-search#readme",
+	"keywords": [
+		"medusa-plugin",
+		"medusa-plugin-search",
+		"medusa-algolia-search",
+		"algolia-search",
+		"algolia",
+		"search-service"
+	]
+}
