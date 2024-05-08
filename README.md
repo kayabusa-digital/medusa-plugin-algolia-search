@@ -67,7 +67,7 @@ const plugins = [
               "images",
             ],
           },
-		  filter: (product) => product.status == "published",
+          filter: (product) => product.status == "published",
           transformer: (product) => ({ 
             id: product.id, 
             // other attributes...
