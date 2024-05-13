@@ -12,14 +12,13 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 	static _isSearchService: boolean = true
 
 	constructor(
-		_: MedusaContainer,
-		logger: Logger,
+		container: MedusaContainer & { logger: Logger },
 		options: AlgoliaPluginOptions
 	) {
-		super(_, options)
+		super(container, options)
 
 		this.config_ = options
-		this.logger_ = logger
+		this.logger_ = container['logger']
 
 		const { applicationId, adminApiKey } = options
 
