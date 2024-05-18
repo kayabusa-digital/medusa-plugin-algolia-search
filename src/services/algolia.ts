@@ -1,7 +1,16 @@
 import { Logger, MedusaContainer, SearchTypes } from '@medusajs/types'
-import { AbstractSearchService, SearchUtils } from '@medusajs/utils'
+import {
+	AbstractSearchService,
+	MedusaError,
+	SearchUtils,
+} from '@medusajs/utils'
 import Algolia, { SearchClient } from 'algoliasearch'
-import { AlgoliaPluginOptions, SearchOptions } from '../types'
+import {
+	AlgoliaPluginOptions,
+	IndexSettingsExtended,
+	IndexTypes,
+	SearchOptions,
+} from '../types'
 
 class AlgoliaService extends SearchUtils.AbstractSearchService {
 	isDefault = false
@@ -10,6 +19,16 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 	protected readonly logger_: Logger
 	protected readonly client_: SearchClient
 	static _isSearchService: boolean = true
+
+	private readonly settings: {
+		[key in IndexTypes]: {
+			[key: string]: {
+				indexSettings: Record<string, unknown>
+				filter: (document: any) => boolean
+				transformer: (document: any) => any
+			}
+		}
+	}
 
 	constructor(
 		container: MedusaContainer & { logger: Logger },
@@ -30,6 +49,59 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 			throw new Error('Please provide a valid Admin Api Key')
 		}
 
+		if (this.config_?.settings == null)
+			throw new MedusaError(
+				MedusaError.Types.INVALID_DATA,
+				'Settings for any index was not settled'
+			)
+
+		const settings: typeof this.settings = {}
+
+		Object.keys(this.config_.settings).forEach((indexType) => {
+			settings[indexType] = {}
+			this.config_.settings[indexType].forEach((settingsPerIndex) => {
+				const filter =
+					settingsPerIndex.filter ??
+					settingsPerIndex.copyFilterFrom != null
+						? this.config_.settings[indexType].find(
+								(index) =>
+									index.indexSettings.indexName ==
+									settingsPerIndex.copyFilterFrom
+						  )?.filter ?? (() => true)
+						: () => true
+
+				const transformer =
+					settingsPerIndex.transformer ??
+					settingsPerIndex.copyTransformerFrom != null
+						? this.config_.settings[indexType].find(
+								(index) =>
+									index.indexSettings.indexName ==
+									settingsPerIndex.copyTransformerFrom
+						  )?.transformer
+						: null
+
+				if (transformer == null)
+					throw new MedusaError(
+						MedusaError.Types.INVALID_DATA,
+						`Transformer for index ${settingsPerIndex.indexSettings.indexName} not found`
+					)
+
+				const indexSettings: Partial<
+					IndexSettingsExtended['indexSettings']
+				> = settingsPerIndex.indexSettings
+				delete indexSettings.indexName
+
+				settings[indexType][settingsPerIndex.indexSettings.indexName] =
+					{
+						indexSettings,
+						filter,
+						transformer,
+					}
+			})
+		})
+
+		this.settings = settings
+
 		this.client_ = Algolia(applicationId, adminApiKey)
 	}
 
@@ -37,11 +109,13 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 		return obj.prototype._isSearchService
 	}
 
-	private getMappedIndexName(indexName: string): string {
-		return (
-			this.config_.settings?.[indexName]?.indexSettings.indexName ??
-			indexName
-		)
+	private getOrThrowSettingsFor(indexName: IndexTypes) {
+		if (this.settings[indexName] == null)
+			throw new MedusaError(
+				MedusaError.Types.UNEXPECTED_STATE,
+				`Settings for ${indexName} index not provided`
+			)
+		return this.settings[indexName]
 	}
 
 	/**
@@ -50,8 +124,11 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 	 * @param {*} options - not required just to match the schema we are used it
 	 * @return {*}
 	 */
-	createIndex(indexName: string, options: Record<string, unknown> = {}) {
-		return this.client_.initIndex(this.getMappedIndexName(indexName))
+	createIndex(indexName: IndexTypes, options: Record<string, unknown> = {}) {
+		const indexesSettings = this.getOrThrowSettingsFor(indexName)
+
+		for (const indexName of Object.keys(indexesSettings))
+			this.client_.initIndex(indexName)
 	}
 
 	/**
@@ -62,10 +139,20 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 	async getIndex(indexName: string) {
 		let hits: Record<string, unknown>[] = []
 
+		const indexesSettings = this.getOrThrowSettingsFor(indexName)
+
+		const indexesNames = Object.keys(indexesSettings)
+
+		if (indexesNames.length == 0)
+			throw new MedusaError(
+				MedusaError.Types.UNEXPECTED_STATE,
+				`No one index settings was provided`
+			)
+
 		return await this.client_
-			.initIndex(this.getMappedIndexName(indexName))
+			.initIndex(indexesNames[0])
 			.browseObjects({
-				query: this.getMappedIndexName(indexName),
+				query: indexesNames[0],
 				batch: (batch) => {
 					hits = hits.concat(batch)
 				},
@@ -81,14 +168,24 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 	 * @return {*}
 	 */
 	async addDocuments(indexName: string, documents: any, type: string) {
-		const transformedDocuments = await this.getTransformedDocuments(
-			type,
-			documents
-		)
+		const indexesSettings = this.getOrThrowSettingsFor(indexName)
 
-		return await this.client_
-			.initIndex(this.getMappedIndexName(indexName))
-			.saveObjects(transformedDocuments)
+		const promises: Promise<any>[] = []
+		for (const indexName of Object.keys(indexesSettings))
+			promises.push(
+				(async (): Promise<any> => {
+					const transformedDocuments = this.getTransformedDocuments(
+						documents,
+						indexesSettings[indexName].filter,
+						indexesSettings[indexName].transformer
+					)
+
+					return await this.client_
+						.initIndex(indexName)
+						.saveObjects(transformedDocuments)
+				})()
+			)
+		await Promise.all(promises)
 	}
 
 	/**
@@ -99,13 +196,25 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 	 * @return {Promise<{object}>} - returns response from search engine provider
 	 */
 	async replaceDocuments(indexName: string, documents: any, type: string) {
-		const transformedDocuments = await this.getTransformedDocuments(
-			type,
-			documents
-		)
-		return await this.client_
-			.initIndex(this.getMappedIndexName(indexName))
-			.replaceAllObjects(transformedDocuments)
+		const indexesSettings = this.getOrThrowSettingsFor(indexName)
+
+		const promises: Promise<any>[] = []
+		for (const indexName of Object.keys(indexesSettings))
+			promises.push(
+				(async (): Promise<any> => {
+					const transformedDocuments = this.getTransformedDocuments(
+						documents,
+						indexesSettings[indexName].filter,
+						indexesSettings[indexName].transformer
+					)
+
+					return await this.client_
+						.initIndex(indexName)
+						.replaceAllObjects(transformedDocuments)
+				})()
+			)
+		const results = await Promise.all(promises)
+		return results?.[0] ?? null
 	}
 
 	/**
@@ -115,9 +224,10 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 	 * @return {Promise<{object}>} - returns response from search engine provider
 	 */
 	async deleteDocument(indexName: string, documentId: string) {
-		return await this.client_
-			.initIndex(this.getMappedIndexName(indexName))
-			.deleteObject(documentId)
+		const indexesSettings = this.getOrThrowSettingsFor(indexName)
+
+		for (const indexName of Object.keys(indexesSettings))
+			await this.client_.initIndex(indexName).deleteObject(documentId)
 	}
 
 	/**
@@ -126,9 +236,10 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 	 * @return {Promise<{object}>} - returns response from search engine provider
 	 */
 	async deleteAllDocuments(indexName: string) {
-		return await this.client_
-			.initIndex(this.getMappedIndexName(indexName))
-			.delete()
+		const indexesSettings = this.getOrThrowSettingsFor(indexName)
+
+		for (const indexName of Object.keys(indexesSettings))
+			await this.client_.initIndex(indexName).delete()
 	}
 
 	/**
@@ -145,7 +256,15 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 		query: string,
 		options: SearchOptions & Record<string, unknown>
 	) {
-		const { paginationOptions, filter, additionalOptions } = options
+		const { paginationOptions, additionalOptions } = options
+		const indexesSettings = this.getOrThrowSettingsFor(indexName)
+		const indexesNames = Object.keys(indexesSettings)
+
+		if (indexesNames.length == 0)
+			throw new MedusaError(
+				MedusaError.Types.UNEXPECTED_STATE,
+				`No one index settings was provided`
+			)
 
 		// fit our pagination options to what Algolia expects
 		if ('limit' in paginationOptions && paginationOptions.limit != null) {
@@ -153,13 +272,10 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 			delete paginationOptions.limit
 		}
 
-		return await this.client_
-			.initIndex(this.getMappedIndexName(indexName))
-			.search(query, {
-				filters: filter,
-				...paginationOptions,
-				...additionalOptions,
-			})
+		return await this.client_.initIndex(indexesNames[0]).search(query, {
+			...paginationOptions,
+			...additionalOptions,
+		})
 	}
 
 	/**
@@ -172,43 +288,32 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 		indexName: string,
 		settings: SearchTypes.IndexSettings & Record<string, unknown>
 	) {
-		// backward compatibility
-		const indexSettings = settings.indexSettings ?? settings ?? {}
+		const indexesSettings = this.getOrThrowSettingsFor(indexName)
 
-		return await this.client_
-			.initIndex(this.getMappedIndexName(indexName))
-			.setSettings(indexSettings)
+		const promises = []
+
+		for (const indexName of Object.keys(indexesSettings))
+			promises.push(
+				(async () => {
+					await this.client_
+						.initIndex(indexName)
+						.setSettings(
+							indexesSettings[indexName].indexSettings ??
+								settings ??
+								{}
+						)
+				})()
+			)
+
+		return await Promise.all(promises)
 	}
 
-	async getTransformedDocuments(type: string, documents: any[]) {
-		if (!documents?.length) {
-			return []
-		}
-
-		const productsTransformer =
-			this.config_.settings?.[SearchUtils.indexTypes.PRODUCTS]
-				?.transformer ?? null
-		const productsFilter =
-			this.config_.settings?.[SearchUtils.indexTypes.PRODUCTS]?.filter ??
-			null
-
-		if (productsTransformer == null) {
-			this.logger_.warn('Products transformer not provided')
-			return []
-		}
-
-		if (productsFilter == null) {
-			this.logger_.warn('Products filter not provided')
-		}
-
-		switch (type) {
-			case SearchUtils.indexTypes.PRODUCTS:
-				return documents
-					.filter(productsFilter ?? (() => true))
-					.map(productsTransformer)
-			default:
-				return documents
-		}
+	getTransformedDocuments(
+		documents: any[],
+		filter: (document: any) => Boolean,
+		transformer: (document: any) => any
+	) {
+		return documents.filter(filter).map(transformer)
 	}
 }
 
