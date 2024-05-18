@@ -281,13 +281,9 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 	/**
 	 * Used to update the settings of an index
 	 * @param  {string} indexName - the index name
-	 * @param {object} settings  - settings object
 	 * @return {Promise<{object}>} - returns response from search engine provider
 	 */
-	async updateSettings(
-		indexName: string,
-		settings: SearchTypes.IndexSettings & Record<string, unknown>
-	) {
+	async updateSettings(indexName: string) {
 		const indexesSettings = this.getOrThrowSettingsFor(indexName)
 
 		const promises = []
@@ -298,9 +294,7 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 					await this.client_
 						.initIndex(indexName)
 						.setSettings(
-							indexesSettings[indexName].indexSettings ??
-								settings ??
-								{}
+							indexesSettings[indexName].indexSettings ?? {}
 						)
 				})()
 			)
