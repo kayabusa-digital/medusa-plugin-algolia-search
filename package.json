@@ -1,6 +1,6 @@
 {
 	"name": "medusa-plugin-algolia-search",
-	"version": "0.1.1",
+	"version": "0.2.0",
 	"description": "Aggregates products, filters products, transforms them and pushes to algolia indexes",
 	"main": "index.js",
 	"scripts": {
