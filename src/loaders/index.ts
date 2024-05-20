@@ -15,8 +15,8 @@ export default async (
 		const { settings } = options
 
 		await Promise.all(
-			Object.entries(settings || {}).map(async ([indexName]) => {
-				return await algoliaService.updateSettings(indexName)
+			Object.entries(settings || {}).map(async ([indexType]) => {
+				return await algoliaService.updateSettings(indexType)
 			})
 		)
 	} catch (err) {
