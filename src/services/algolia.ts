@@ -134,7 +134,7 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 	/**
 	 * Used to get an index
 	 * @param {string} indexType  - the index name.
-	 * @return {Promise<{object}>} - returns response from search engine provider
+	 * @return {Promise<{object}>} - returns response from first declared in settings search engine provider
 	 */
 	async getIndex(indexType: IndexTypes) {
 		let hits: Record<string, unknown>[] = []
@@ -165,7 +165,7 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 	 * @param {string} indexType - the index type
 	 * @param {Array} documents - products list array
 	 * @param {*} type
-	 * @return {*}
+	 * @return {Promise<{object}[]>} - returns response from all search engine providers
 	 */
 	async addDocuments(indexType: IndexTypes, documents: any, type: string) {
 		const indexesSettings = this.getOrThrowSettingsFor(indexType)
@@ -185,7 +185,7 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 						.saveObjects(transformedDocuments)
 				})()
 			)
-		await Promise.all(promises)
+		return await Promise.all(promises)
 	}
 
 	/**
@@ -193,7 +193,7 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 	 * @param {string} indexType  - the index type.
 	 * @param {Object} documents  - array of document objects that will replace existing documents
 	 * @param {Array.<Object>} type  - type of documents to be replaced (e.g: products, regions, orders, etc)
-	 * @return {Promise<{object}>} - returns response from search engine provider
+	 * @return {Promise<{object}[]>} - returns response from all search engine providers
 	 */
 	async replaceDocuments(
 		indexType: IndexTypes,
@@ -217,33 +217,40 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 						.replaceAllObjects(transformedDocuments)
 				})()
 			)
-		const results = await Promise.all(promises)
-		return results?.[0] ?? null
+		return await Promise.all(promises)
 	}
 
 	/**
 	 * Used to delete document
 	 * @param {string} indexType  - the index type
 	 * @param {string} documentId  - the id of the document
-	 * @return {Promise<{object}>} - returns response from search engine provider
+	 * @return {Promise<{object}[]>} - returns response from all search engine provider
 	 */
 	async deleteDocument(indexType: string, documentId: string) {
 		const indexesSettings = this.getOrThrowSettingsFor(indexType)
 
+		const promises = []
 		for (const indexName of Object.keys(indexesSettings))
-			await this.client_.initIndex(indexName).deleteObject(documentId)
+			promises.push(
+				this.client_.initIndex(indexName).deleteObject(documentId)
+			)
+
+		return await Promise.all(promises)
 	}
 
 	/**
 	 * Used to delete all documents
 	 * @param {string} indexType  - the index type
-	 * @return {Promise<{object}>} - returns response from search engine provider
+	 * @return {Promise<{object}>[]} - returns response from all search engine providers
 	 */
 	async deleteAllDocuments(indexType: IndexTypes) {
 		const indexesSettings = this.getOrThrowSettingsFor(indexType)
 
+		const promises = []
 		for (const indexName of Object.keys(indexesSettings))
-			await this.client_.initIndex(indexName).delete()
+			promises.push(this.client_.initIndex(indexName).delete())
+
+		return await Promise.all(promises)
 	}
 
 	/**
@@ -285,7 +292,7 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 	/**
 	 * Used to update the settings of an index
 	 * @param  {string} indexType - the index type
-	 * @return {Promise<{object}>} - returns response from search engine provider
+	 * @return {Promise<{object}>} - returns response from all search engine providers which was updated
 	 */
 	async updateSettings(indexType: IndexTypes) {
 		const indexesSettings = this.getOrThrowSettingsFor(indexType)
