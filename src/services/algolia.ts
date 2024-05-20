@@ -30,6 +30,54 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 		}
 	}
 
+	private getFunctionsForIndex(
+		indexName: string,
+		indexesSettings: IndexSettingsExtended[]
+	): {
+		filter: (document: any) => boolean
+		transformer: (document: any) => any
+	} {
+		const currentIndex = indexesSettings.find(
+			(index) => index.indexSettings.indexName == indexName
+		)
+		if (currentIndex == null)
+			throw new MedusaError(
+				MedusaError.Types.NOT_FOUND,
+				`Index settings for index '${indexName}' not found`
+			)
+
+		let filter =
+			(typeof currentIndex.filter === 'function'
+				? currentIndex.filter
+				: null) ?? currentIndex.copyFilterFrom
+		let transformer =
+			(typeof currentIndex.transformer === 'function'
+				? currentIndex.transformer
+				: null) ?? currentIndex.copyTransformerFrom
+
+		if (typeof filter === 'string')
+			filter = indexesSettings.find(
+				(index) => index.indexSettings.indexName == filter
+			)?.filter
+		if (filter == null) filter = () => true
+
+		if (typeof transformer === 'string')
+			transformer = indexesSettings.find(
+				(index) => index.indexSettings.indexName == transformer
+			)?.transformer
+
+		if (transformer == null)
+			throw new MedusaError(
+				MedusaError.Types.INVALID_DATA,
+				`Transformer for index ${indexName} not found`
+			)
+
+		return {
+			filter,
+			transformer,
+		}
+	}
+
 	constructor(
 		container: MedusaContainer & { logger: Logger },
 		options: AlgoliaPluginOptions
@@ -60,31 +108,10 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 		Object.keys(this.config_.settings).forEach((indexType) => {
 			settings[indexType] = {}
 			this.config_.settings[indexType].forEach((settingsPerIndex) => {
-				const filter =
-					settingsPerIndex.filter ??
-					settingsPerIndex.copyFilterFrom != null
-						? this.config_.settings[indexType].find(
-								(index) =>
-									index.indexSettings.indexName ==
-									settingsPerIndex.copyFilterFrom
-						  )?.filter ?? (() => true)
-						: () => true
-
-				const transformer =
-					settingsPerIndex.transformer ??
-					settingsPerIndex.copyTransformerFrom != null
-						? this.config_.settings[indexType].find(
-								(index) =>
-									index.indexSettings.indexName ==
-									settingsPerIndex.copyTransformerFrom
-						  )?.transformer
-						: null
-
-				if (transformer == null)
-					throw new MedusaError(
-						MedusaError.Types.INVALID_DATA,
-						`Transformer for index ${settingsPerIndex.indexSettings.indexName} not found`
-					)
+				const { filter, transformer } = this.getFunctionsForIndex(
+					settingsPerIndex.indexSettings.indexName,
+					this.config_.settings[indexType]
+				)
 
 				const indexSettings: Partial<
 					IndexSettingsExtended['indexSettings']
@@ -101,6 +128,8 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 		})
 
 		this.settings = settings
+
+		console.log(this.settings)
 
 		this.client_ = Algolia(applicationId, adminApiKey)
 	}
