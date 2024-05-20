@@ -109,23 +109,23 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 		return obj.prototype._isSearchService
 	}
 
-	private getOrThrowSettingsFor(indexName: IndexTypes) {
-		if (this.settings[indexName] == null)
+	private getOrThrowSettingsFor(indexType: IndexTypes) {
+		if (this.settings[indexType] == null)
 			throw new MedusaError(
 				MedusaError.Types.UNEXPECTED_STATE,
-				`Settings for ${indexName} index not provided`
+				`Settings for ${indexType} index not provided`
 			)
-		return this.settings[indexName]
+		return this.settings[indexType]
 	}
 
 	/**
 	 * Add two numbers.
-	 * @param {string} indexName - The name of the index
+	 * @param {string} indexType - The name of the index
 	 * @param {*} options - not required just to match the schema we are used it
 	 * @return {*}
 	 */
-	createIndex(indexName: IndexTypes, options: Record<string, unknown> = {}) {
-		const indexesSettings = this.getOrThrowSettingsFor(indexName)
+	createIndex(indexType: IndexTypes, options: Record<string, unknown> = {}) {
+		const indexesSettings = this.getOrThrowSettingsFor(indexType)
 
 		for (const indexName of Object.keys(indexesSettings))
 			this.client_.initIndex(indexName)
@@ -133,13 +133,13 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 
 	/**
 	 * Used to get an index
-	 * @param {string} indexName  - the index name.
+	 * @param {string} indexType  - the index name.
 	 * @return {Promise<{object}>} - returns response from search engine provider
 	 */
-	async getIndex(indexName: string) {
+	async getIndex(indexType: IndexTypes) {
 		let hits: Record<string, unknown>[] = []
 
-		const indexesSettings = this.getOrThrowSettingsFor(indexName)
+		const indexesSettings = this.getOrThrowSettingsFor(indexType)
 
 		const indexesNames = Object.keys(indexesSettings)
 
@@ -162,13 +162,13 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 
 	/**
 	 *
-	 * @param {string} indexName
+	 * @param {string} indexType - the index type
 	 * @param {Array} documents - products list array
 	 * @param {*} type
 	 * @return {*}
 	 */
-	async addDocuments(indexName: string, documents: any, type: string) {
-		const indexesSettings = this.getOrThrowSettingsFor(indexName)
+	async addDocuments(indexType: IndexTypes, documents: any, type: string) {
+		const indexesSettings = this.getOrThrowSettingsFor(indexType)
 
 		const promises: Promise<any>[] = []
 		for (const indexName of Object.keys(indexesSettings))
@@ -190,13 +190,17 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 
 	/**
 	 * Used to replace documents
-	 * @param {string} indexName  - the index name.
+	 * @param {string} indexType  - the index type.
 	 * @param {Object} documents  - array of document objects that will replace existing documents
 	 * @param {Array.<Object>} type  - type of documents to be replaced (e.g: products, regions, orders, etc)
 	 * @return {Promise<{object}>} - returns response from search engine provider
 	 */
-	async replaceDocuments(indexName: string, documents: any, type: string) {
-		const indexesSettings = this.getOrThrowSettingsFor(indexName)
+	async replaceDocuments(
+		indexType: IndexTypes,
+		documents: any,
+		type: string
+	) {
+		const indexesSettings = this.getOrThrowSettingsFor(indexType)
 
 		const promises: Promise<any>[] = []
 		for (const indexName of Object.keys(indexesSettings))
@@ -219,12 +223,12 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 
 	/**
 	 * Used to delete document
-	 * @param {string} indexName  - the index name
+	 * @param {string} indexType  - the index type
 	 * @param {string} documentId  - the id of the document
 	 * @return {Promise<{object}>} - returns response from search engine provider
 	 */
-	async deleteDocument(indexName: string, documentId: string) {
-		const indexesSettings = this.getOrThrowSettingsFor(indexName)
+	async deleteDocument(indexType: string, documentId: string) {
+		const indexesSettings = this.getOrThrowSettingsFor(indexType)
 
 		for (const indexName of Object.keys(indexesSettings))
 			await this.client_.initIndex(indexName).deleteObject(documentId)
@@ -232,11 +236,11 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 
 	/**
 	 * Used to delete all documents
-	 * @param {string} indexName  - the index name
+	 * @param {string} indexType  - the index type
 	 * @return {Promise<{object}>} - returns response from search engine provider
 	 */
-	async deleteAllDocuments(indexName: string) {
-		const indexesSettings = this.getOrThrowSettingsFor(indexName)
+	async deleteAllDocuments(indexType: IndexTypes) {
+		const indexesSettings = this.getOrThrowSettingsFor(indexType)
 
 		for (const indexName of Object.keys(indexesSettings))
 			await this.client_.initIndex(indexName).delete()
@@ -244,20 +248,20 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 
 	/**
 	 * Used to search for a document in an index
-	 * @param {string} indexName - the index name
+	 * @param {string} indexType - the index type
 	 * @param {string} query  - the search query
 	 * @param {*} options
 	 * - any options passed to the request object other than the query and indexName
 	 * - additionalOptions contain any provider specific options
-	 * @return {*} - returns response from search engine provider
+	 * @return {*} - returns response from first declared index in settings
 	 */
 	async search(
-		indexName: string,
+		indexType: IndexTypes,
 		query: string,
 		options: SearchOptions & Record<string, unknown>
 	) {
 		const { paginationOptions, additionalOptions } = options
-		const indexesSettings = this.getOrThrowSettingsFor(indexName)
+		const indexesSettings = this.getOrThrowSettingsFor(indexType)
 		const indexesNames = Object.keys(indexesSettings)
 
 		if (indexesNames.length == 0)
@@ -280,11 +284,11 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 
 	/**
 	 * Used to update the settings of an index
-	 * @param  {string} indexName - the index name
+	 * @param  {string} indexType - the index type
 	 * @return {Promise<{object}>} - returns response from search engine provider
 	 */
-	async updateSettings(indexName: string) {
-		const indexesSettings = this.getOrThrowSettingsFor(indexName)
+	async updateSettings(indexType: IndexTypes) {
+		const indexesSettings = this.getOrThrowSettingsFor(indexType)
 
 		const promises = []
 
