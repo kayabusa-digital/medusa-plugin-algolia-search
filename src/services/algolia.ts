@@ -115,7 +115,7 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 
 				const indexSettings: Partial<
 					IndexSettingsExtended['indexSettings']
-				> = settingsPerIndex.indexSettings
+				> = { ...settingsPerIndex.indexSettings }
 				delete indexSettings.indexName
 
 				settings[indexType][settingsPerIndex.indexSettings.indexName] =
