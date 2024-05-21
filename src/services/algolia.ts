@@ -47,24 +47,15 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 			)
 
 		let filter =
-			(typeof currentIndex.filter === 'function'
+			typeof currentIndex.filter === 'function'
 				? currentIndex.filter
-				: null) ?? currentIndex.copyFilterFrom
+				: null
 		let transformer =
-			(typeof currentIndex.transformer === 'function'
+			typeof currentIndex.transformer === 'function'
 				? currentIndex.transformer
-				: null) ?? currentIndex.copyTransformerFrom
+				: null
 
-		if (typeof filter === 'string')
-			filter = indexesSettings.find(
-				(index) => index.indexSettings.indexName == filter
-			)?.filter
 		if (filter == null) filter = () => true
-
-		if (typeof transformer === 'string')
-			transformer = indexesSettings.find(
-				(index) => index.indexSettings.indexName == transformer
-			)?.transformer
 
 		if (transformer == null)
 			throw new MedusaError(
