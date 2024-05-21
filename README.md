@@ -87,15 +87,13 @@ We decided to make settings type like this
 ```ts
 settings: {
     indexSettings: {
-        indexName: string // algolia index name in case you are using not `products` name for index, this property are value for copy(Transformer|Filter)From properties, if you are using `products` naming and want to copy methods from this settings, name it `products`. Must be unique value
+        indexName: string // algolia index name. Must be unique value
     }
-    copyTransformerFrom?: string // indexName of existing IndexSettingsExtended array, transformer of which will be used, otherwise itself declared transformer be used
-    copyFilterFrom?: string // indexName of existing IndexSettingsExtended array, filter of which will be used, otherwise itself declared filter be used
     filter?: (document: any) => boolean
-	transformer?: (document: any) => boolean
+    transformer?: (document: any) => boolean
 }[]
 ```
-This allow you to upload products in different indexes using different transformers and filters, in case you dont want to overload your `medusa-config.js`, you may use `copyTransformerFrom` and `copyFilterFrom` </br>
+This allow you to upload products in different indexes using different transformers and filters</br>
 
 For example
 ```ts
@@ -135,7 +133,15 @@ For example
 						searchableAttributes: ['title', 'description'],
 						attributesToRetrieve: ['objectID', 'title'],
 					},
-					copyFilterFrom: 'products',
+					filter: (product) => {
+						if (
+							product?.status != null &&
+							product.status != 'draft'
+						)
+							return false
+
+						return true
+					},
 					transformer: (product) => {
 						return {
 							objectID: product.id,
