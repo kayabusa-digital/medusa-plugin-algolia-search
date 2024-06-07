@@ -81,17 +81,20 @@ const plugins = [
 
 ### For further use learn our features
 
+#### Filtering
 Settings object may contain few types of entities medusa loads</br>
 Now, medusa presents only `products`, which triggers update of all indexes declared under `products` array in `settings` object </br>
 We decided to make settings type like this
 ```ts
 settings: {
-    indexSettings: {
-        indexName: string // algolia index name. Must be unique value
-    }
-    filter?: (document: any) => boolean
-    transformer?: (document: any) => boolean
-}[]
+	[key: string]:{ // 'products' | string
+		indexSettings: {
+			indexName: string // algolia index name. Must be unique value
+		}
+		filter?: (document: any) => boolean
+		transformer?: (document: any) => boolean
+	}[]
+}
 ```
 This allow you to upload products in different indexes using different transformers and filters</br>
 
@@ -154,6 +157,20 @@ For example
 	},
 },
 ```
+
+#### Scheduled refresh
+```ts
+type AlgoliaPluginOptions = {
+	applicationId: string
+	adminApiKey: string
+	scheduledRefresh?: string // cron string or nothing to get refresh repeatly in settled period
+	settings: {
+		[key in IndexTypes]: IndexSettingsExtended[]
+	}
+}
+```
+You may schedule refresh job via [cron string](https://crontab.guru/examples.html), which will emit ```SEARCH_INDEX_EVENT``` like on startup every time it will be executed.
+
 
 ---
 
