@@ -18,6 +18,7 @@ export type IndexTypes = 'products' | string
 export type AlgoliaPluginOptions = {
 	applicationId: string
 	adminApiKey: string
+	scheduledRefresh?: string // cron string or nothing to get refresh repeatly in settled period
 	/**
 	 * Index settings
 	 */

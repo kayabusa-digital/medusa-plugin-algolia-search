@@ -18,6 +18,7 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 	protected readonly config_: AlgoliaPluginOptions
 	protected readonly logger_: Logger
 	protected readonly client_: SearchClient
+
 	static _isSearchService: boolean = true
 
 	private readonly settings: {
@@ -70,7 +71,9 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 	}
 
 	constructor(
-		container: MedusaContainer & { logger: Logger },
+		container: MedusaContainer & {
+			logger: Logger
+		},
 		options: AlgoliaPluginOptions
 	) {
 		super(container, options)
