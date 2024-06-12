@@ -190,22 +190,37 @@ class AlgoliaService extends SearchUtils.AbstractSearchService {
 	 * @param {*} type
 	 * @return {Promise<{object}[]>} - returns response from all search engine providers
 	 */
-	async addDocuments(indexType: IndexTypes, documents: any, type: string) {
+	async addDocuments(
+		indexType: IndexTypes,
+		documents: Array<any>,
+		type: string
+	) {
 		const indexesSettings = this.getOrThrowSettingsFor(indexType)
 
 		const promises: Promise<any>[] = []
 		for (const indexName of Object.keys(indexesSettings))
 			promises.push(
 				(async (): Promise<any> => {
+					const filteredDocumentsForDeletion = documents.filter(
+						(document) =>
+							!indexesSettings[indexName].filter(document)
+					)
+
 					const transformedDocuments = this.getTransformedDocuments(
 						documents,
 						indexesSettings[indexName].filter,
 						indexesSettings[indexName].transformer
 					)
 
-					return await this.client_
-						.initIndex(indexName)
-						.saveObjects(transformedDocuments)
+					const index = this.client_.initIndex(indexName)
+					return await Promise.all([
+						index.saveObjects(transformedDocuments),
+						index.deleteObjects(
+							filteredDocumentsForDeletion.map(
+								(document) => document.id
+							)
+						),
+					])
 				})()
 			)
 		return await Promise.all(promises)
