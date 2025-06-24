@@ -30,8 +30,8 @@
 		"type": "git",
 		"url": "git+https://github.com/kayabusa-digital/medusa-plugin-algolia-search.git"
 	},
-	"author": "Kayabusa-tech",
-	"license": "ISC",
+	"author": "Kayabusa Digital LLC",
+	"license": "UNLICENSED",
 	"bugs": {
 		"url": "https://github.com/kayabusa-digital/medusa-plugin-algolia-search/issues"
 	},
@@ -40,6 +40,7 @@
 		"medusa-plugin",
 		"medusa-plugin-search",
 		"medusa-algolia-search",
+    "medusa-algolia",
 		"algolia-search",
 		"algolia",
 		"search-service"
